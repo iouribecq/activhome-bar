@@ -725,7 +725,7 @@ function scrollToInEditor(el, { topOffset = 24, behavior = "smooth" } = {}) {
     set hass(hass) {
       this._hass = hass;
       if (this._globalFieldsEl) this._buildGlobalFields();
-      const condEditors = this.shadowRoot ? this.shadowRoot.querySelectorAll("ha-conditions-editor") : [];
+      const condEditors = this.shadowRoot ? this.shadowRoot.querySelectorAll("ha-card-conditions-editor") : [];
       condEditors.forEach(ed => ed.hass = hass);
     }
 
@@ -820,7 +820,7 @@ setConfig(config) {
           .items{ display:grid; gap: 10px; }
           .mini{ font-size: 12px; opacity: .8; }
           
-          ha-conditions-editor {
+          ha-card-conditions-editor {
             display: block;
             margin-top: 8px;
           }
@@ -1406,27 +1406,16 @@ box.addEventListener("toggle", () => {
         `;
         visDetails.appendChild(visSummary);
 
-        const cond = document.createElement("ha-conditions-editor");
+        const cond = document.createElement("ha-card-conditions-editor");
         cond.hass = this._hass;
-
-        // le format attendu est un tableau de conditions
-        cond.conditions = Array.isArray(item.visibility) ? item.visibility : (item.visibility ? [item.visibility] : []);
-
-        const onConditionsChange = (ev) => {
-          // selon versions, ça peut sortir dans detail.value OU detail.conditions
-          const v =
-            ev.detail?.value ??
-            ev.detail?.conditions ??
-            [];
-
+        cond.conditions = item.visibility || [];
+        cond.addEventListener("value-changed", (ev) => {
+          const v = ev.detail?.value || [];
           const next = [...getItems()];
-          next[idx] = { ...(next[idx] || {}), visibility: Array.isArray(v) ? v : [] };
+          next[idx] = { ...(next[idx] || {}), visibility: v };
           this._config = { ...this._config, items: next };
           emit();
-        };
-
-        cond.addEventListener("value-changed", onConditionsChange);
-        cond.addEventListener("conditions-changed", onConditionsChange);
+        });
 
         const visBody = document.createElement("div");
         visBody.style.marginTop = "10px";
