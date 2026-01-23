@@ -1,6 +1,5 @@
 ﻿{
   "name": "Activhome Bar",
-  "content_in_root": false,
   "filename": "activhome-bar.js",
   "render_readme": true
 }
