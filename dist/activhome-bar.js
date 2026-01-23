@@ -129,84 +129,85 @@
   // `scrollIntoView()` can be insufficient with nested shadow roots; this helper
   // searches for a real scrollable ancestor (dialog content) and adjusts scrollTop.
   function _findHaDialogScroller() {
-  // Try to locate the Lovelace "Edit card" dialog scroll container (shadow DOM aware).
-  const haRoot = document.querySelector("body > home-assistant");
-  const editCard = haRoot?.shadowRoot?.querySelector("hui-dialog-edit-card");
-  const editDash = haRoot?.shadowRoot?.querySelector("hui-dialog-edit-dashboard");
-  const host = editCard || editDash;
-  const haDialog = host?.shadowRoot?.querySelector("ha-dialog");
-  const mwc = haDialog?.shadowRoot?.querySelector("mwc-dialog");
-  const scroller =
-    mwc?.shadowRoot?.querySelector(".mdc-dialog__content") ||
-    mwc?.shadowRoot?.querySelector(".mdc-dialog__surface") ||
-    haDialog;
-  return scroller || null;
-}
+    // Try to locate the Lovelace "Edit card" dialog scroll container (shadow DOM aware).
+    const haRoot = document.querySelector("body > home-assistant");
+    const editCard = haRoot?.shadowRoot?.querySelector("hui-dialog-edit-card");
+    const editDash = haRoot?.shadowRoot?.querySelector("hui-dialog-edit-dashboard");
+    const host = editCard || editDash;
+    const haDialog = host?.shadowRoot?.querySelector("ha-dialog");
+    const mwc = haDialog?.shadowRoot?.querySelector("mwc-dialog");
+    const scroller =
+      mwc?.shadowRoot?.querySelector(".mdc-dialog__content") ||
+      mwc?.shadowRoot?.querySelector(".mdc-dialog__surface") ||
+      haDialog;
+    return scroller || null;
+  }
 
-function scrollToInEditor(el, { topOffset = 24, behavior = "smooth" } = {}) {
-  if (!el) return;
+  function scrollToInEditor(el, { topOffset = 24, behavior = "smooth" } = {}) {
+    if (!el) return;
 
-  // 1) If a known HA edit dialog scroller exists, scroll it directly (most reliable).
-  const tryScrollEditDialog = () => {
-    try {
-      const ha = document.querySelector("body > home-assistant");
-      const haRoot = ha && ha.shadowRoot;
-      const dlg = haRoot && haRoot.querySelector("hui-dialog-edit-card");
-      const dlgRoot = dlg && dlg.shadowRoot;
-      const haDialog = dlgRoot && dlgRoot.querySelector("ha-dialog");
-      const haDialogRoot = haDialog && haDialog.shadowRoot;
-      const scroller =
-        (haDialogRoot && haDialogRoot.querySelector(".mdc-dialog__content")) ||
-        (dlgRoot && dlgRoot.querySelector(".content")) ||
-        null;
+    // 1) If a known HA edit dialog scroller exists, scroll it directly (most reliable).
+    const tryScrollEditDialog = () => {
+      try {
+        const ha = document.querySelector("body > home-assistant");
+        const haRoot = ha && ha.shadowRoot;
+        const dlg = haRoot && haRoot.querySelector("hui-dialog-edit-card");
+        const dlgRoot = dlg && dlg.shadowRoot;
+        const haDialog = dlgRoot && dlgRoot.querySelector("ha-dialog");
+        const haDialogRoot = haDialog && haDialog.shadowRoot;
+        const scroller =
+          (haDialogRoot && haDialogRoot.querySelector(".mdc-dialog__content")) ||
+          (dlgRoot && dlgRoot.querySelector(".content")) ||
+          null;
 
-      if (scroller && scroller.scrollHeight > scroller.clientHeight + 4) {
-        const rEl = el.getBoundingClientRect();
-        const rSc = scroller.getBoundingClientRect();
-        scroller.scrollTop = Math.max(0, scroller.scrollTop + (rEl.top - rSc.top - topOffset));
-        return true;
+        if (scroller && scroller.scrollHeight > scroller.clientHeight + 4) {
+          const rEl = el.getBoundingClientRect();
+          const rSc = scroller.getBoundingClientRect();
+          scroller.scrollTop = Math.max(0, scroller.scrollTop + (rEl.top - rSc.top - topOffset));
+          return true;
+        }
+      } catch (e) {
+        // ignore
       }
-    } catch (e) {
-      // ignore
+      return false;
+    };
+
+    if (tryScrollEditDialog()) return;
+
+    // 2) Walk up through regular DOM + shadow hosts to find a scroll container.
+    const isScrollable = (node) => {
+      if (!(node instanceof HTMLElement)) return false;
+      const cs = getComputedStyle(node);
+      const oy = cs.overflowY;
+      const ox = cs.overflowX;
+      return (
+        (oy === "auto" || oy === "scroll" || ox === "auto" || ox === "scroll") &&
+        node.scrollHeight > node.clientHeight + 4
+      );
+    };
+
+    let n = el;
+    for (let i = 0; i < 80 && n; i++) {
+      if (n instanceof HTMLElement && isScrollable(n)) break;
+      const root = n.getRootNode && n.getRootNode();
+      n = n.parentNode || (root && root.host) || null;
     }
-    return false;
-  };
 
-  if (tryScrollEditDialog()) return;
+    if (n instanceof HTMLElement && isScrollable(n)) {
+      const rEl = el.getBoundingClientRect();
+      const rSc = n.getBoundingClientRect();
+      n.scrollTop = Math.max(0, n.scrollTop + (rEl.top - rSc.top - topOffset));
+      return;
+    }
 
-  // 2) Walk up through regular DOM + shadow hosts to find a scroll container.
-  const isScrollable = (node) => {
-    if (!(node instanceof HTMLElement)) return false;
-    const cs = getComputedStyle(node);
-    const oy = cs.overflowY;
-    const ox = cs.overflowX;
-    return (
-      (oy === "auto" || oy === "scroll" || ox === "auto" || ox === "scroll") &&
-      node.scrollHeight > node.clientHeight + 4
-    );
-  };
-
-  let n = el;
-  for (let i = 0; i < 80 && n; i++) {
-    if (n instanceof HTMLElement && isScrollable(n)) break;
-    const root = n.getRootNode && n.getRootNode();
-    n = n.parentNode || (root && root.host) || null;
+    // 3) Last resort: native scrollIntoView (works sometimes, but not always inside HA dialogs).
+    try {
+      el.scrollIntoView({ behavior, block: "start", inline: "nearest" });
+    } catch (e) {
+      el.scrollIntoView();
+    }
   }
 
-  if (n instanceof HTMLElement && isScrollable(n)) {
-    const rEl = el.getBoundingClientRect();
-    const rSc = n.getBoundingClientRect();
-    n.scrollTop = Math.max(0, n.scrollTop + (rEl.top - rSc.top - topOffset));
-    return;
-  }
-
-  // 3) Last resort: native scrollIntoView (works sometimes, but not always inside HA dialogs).
-  try {
-    el.scrollIntoView({ behavior, block: "start", inline: "nearest" });
-  } catch (e) {
-    el.scrollIntoView();
-  }
-}
   // --- Optional Home Assistant theme support -------------------------------
   function _getThemeVars(hass, themeName) {
     const themes = hass?.themes?.themes;
@@ -729,43 +730,42 @@ function scrollToInEditor(el, { topOffset = 24, behavior = "smooth" } = {}) {
       condEditors.forEach(ed => ed.hass = hass);
     }
 
-    
-setConfig(config) {
-  this._config = { ...DEFAULTS, ...(config || {}) };
-  if (!Array.isArray(this._config.items)) this._config.items = [];
+    setConfig(config) {
+      this._config = { ...DEFAULTS, ...(config || {}) };
+      if (!Array.isArray(this._config.items)) this._config.items = [];
 
-  this._ensureRendered();
+      this._ensureRendered();
 
-  // HA calls setConfig very often (every tiny change). Rebuilding the whole editor
-  // each time creates latency and also collapses <details>.
-  //
-  // Strategy:
-  // - First time: full sync (build global fields + render items).
-  // - Next times: DO NOT rebuild unless the items structure changed (add/remove/reorder)
-  //   and we're not currently typing in a text field.
-  const items = this._config.items || [];
-  const fingerprint = items.length + "|" + items.map((it) => (it && typeof it === "object" ? (it.name || "") : "")).join("");
+      // HA calls setConfig very often (every tiny change). Rebuilding the whole editor
+      // each time creates latency and also collapses <details>.
+      //
+      // Strategy:
+      // - First time: full sync (build global fields + render items).
+      // - Next times: DO NOT rebuild unless the items structure changed (add/remove/reorder)
+      //   and we're not currently typing in a text field.
+      const items = this._config.items || [];
+      const fingerprint = items.length + "|" + items.map((it) => (it && typeof it === "object" ? (it.name || "") : "")).join("");
 
-  if (!this._didInitialSync) {
-    this._didInitialSync = true;
-    this._lastItemsFingerprint = fingerprint;
-    this._syncAll();
-    return;
-  }
+      if (!this._didInitialSync) {
+        this._didInitialSync = true;
+        this._lastItemsFingerprint = fingerprint;
+        this._syncAll();
+        return;
+      }
 
-  // While typing, never re-render. We'll refresh when focus leaves.
-  if (this._isTyping) {
-    this._pendingSync = true;
-    this._lastItemsFingerprint = fingerprint;
-    return;
-  }
+      // While typing, never re-render. We'll refresh when focus leaves.
+      if (this._isTyping) {
+        this._pendingSync = true;
+        this._lastItemsFingerprint = fingerprint;
+        return;
+      }
 
-  // Re-render ONLY if structure likely changed.
-  if (fingerprint !== this._lastItemsFingerprint) {
-    this._lastItemsFingerprint = fingerprint;
-    this._renderItems();
-  }
-}
+      // Re-render ONLY if structure likely changed.
+      if (fingerprint !== this._lastItemsFingerprint) {
+        this._lastItemsFingerprint = fingerprint;
+        this._renderItems();
+      }
+    }
 
     connectedCallback() {
       if (!this.shadowRoot) this.attachShadow({ mode: "open" });
@@ -1174,13 +1174,13 @@ setConfig(config) {
         box.className = "box";
         if (this._openIndex === idx) box.open = true;
 
-box.addEventListener("toggle", () => {
-  if (box.open) {
-    this._openIndex = idx;
-  } else if (this._openIndex === idx) {
-    this._openIndex = null;
-  }
-});
+        box.addEventListener("toggle", () => {
+          if (box.open) {
+            this._openIndex = idx;
+          } else if (this._openIndex === idx) {
+            this._openIndex = null;
+          }
+        });
 
         const header = document.createElement("summary");
         header.className = "row";
@@ -1361,16 +1361,6 @@ box.addEventListener("toggle", () => {
           : { action: (item.tap_action || "more-info") };
 
         selector.addEventListener("value-changed", (ev) => {
-          // IMPORTANT: In some HA frontend versions, the ui_action selector doesn't
-          // immediately reveal its sub-fields (e.g. navigation_path) after switching
-          // the action type, unless the value object reference changes and the
-          // component is forced to refresh. Toggling "code editor" in HA causes a
-          // full re-render, which is why the field appears then.
-          //
-          // To fix this without changing anything else in the card/editor logic:
-          // - clone the value to guarantee a new reference
-          // - re-assign selector.value (controlled-style)
-          // - request a refresh on the selector component
           const raw = ev.detail?.value || { action: "more-info" };
           const v = (raw && typeof raw === "object") ? { ...raw } : raw;
 
@@ -1378,6 +1368,7 @@ box.addEventListener("toggle", () => {
           selector.value = v;
           if (typeof selector.requestUpdate === "function") selector.requestUpdate();
           else selector.dispatchEvent(new CustomEvent("_force-refresh"));
+
           const next = [...getItems()];
           next[idx] = { ...(next[idx] || {}), tap_action: v };
           this._config = { ...this._config, items: next };
@@ -1392,6 +1383,7 @@ box.addEventListener("toggle", () => {
 
         content.appendChild(selector);
 
+        // ---------------- Visibilité (FIXED) ----------------
         const visDetails = document.createElement("details");
         visDetails.className = "box";
         visDetails.style.marginTop = "12px";
@@ -1408,13 +1400,52 @@ box.addEventListener("toggle", () => {
 
         const cond = document.createElement("ha-card-conditions-editor");
         cond.hass = this._hass;
-        cond.conditions = item.visibility || [];
+
+        const setCondValue = (editor, value) => {
+          if (!editor) return;
+
+          const raw = Array.isArray(value) ? value : (value ? [value] : []);
+          // IMPORTANT: new reference (shallow clone) to force HA editor to refresh sub-fields reliably
+          const v = raw.map((c) => (c && typeof c === "object" ? { ...c } : c));
+
+          if ("conditions" in editor) editor.conditions = v;
+          if ("value" in editor) editor.value = v;
+
+          if (typeof editor.requestUpdate === "function") editor.requestUpdate();
+          // Some HA builds need a microtask to settle layout & nested editors
+          Promise.resolve().then(() => {
+            if (typeof editor.requestUpdate === "function") editor.requestUpdate();
+          });
+        };
+
+        const refreshCond = () => {
+          try {
+            if (typeof cond.requestUpdate === "function") cond.requestUpdate();
+            Promise.resolve().then(() => {
+              if (typeof cond.requestUpdate === "function") cond.requestUpdate();
+            });
+          } catch (e) {}
+        };
+
+        // When the <details> opens, force a refresh (editor inside collapsed container).
+        visDetails.addEventListener("toggle", () => {
+          if (visDetails.open) refreshCond();
+        });
+
+        setCondValue(cond, item.visibility || []);
+
         cond.addEventListener("value-changed", (ev) => {
-          const v = ev.detail?.value || [];
+          const v = ev.detail?.value ?? ev.detail?.conditions ?? [];
+          const vNorm = Array.isArray(v) ? v : (v ? [v] : []);
+
           const next = [...getItems()];
-          next[idx] = { ...(next[idx] || {}), visibility: v };
+          next[idx] = { ...(next[idx] || {}), visibility: vNorm };
           this._config = { ...this._config, items: next };
           emit();
+
+          // Re-push a fresh reference so HA editor reliably shows nested fields
+          setCondValue(cond, vNorm);
+          refreshCond();
         });
 
         const visBody = document.createElement("div");
@@ -1422,6 +1453,7 @@ box.addEventListener("toggle", () => {
         visBody.appendChild(cond);
         visDetails.appendChild(visBody);
         content.appendChild(visDetails);
+        // ----------------------------------------------------
 
         box.appendChild(content);
         wrap.appendChild(box);
