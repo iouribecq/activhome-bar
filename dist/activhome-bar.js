@@ -1,4 +1,4 @@
-// Activhome Bar - v0.1.6 (Modifié)
+// Activhome Bar - v0.1.7 (iPad interaction fix - light-stack pattern)
 // Type: custom:activhome-bar
 //
 // CHANGELOG v0.1.6:
@@ -453,12 +453,26 @@
   class ActivhomeBar extends HTMLElement {
     set hass(hass) {
       this._hass = hass;
-      this._render();
+
+      // Home Assistant appelle set hass très souvent.
+      // On évite de reconstruire tout le DOM à chaque changement d'état.
+      // On ne re-render que si la visibilité des items change.
+      const newFingerprint = (this._config?.items || [])
+        .map((it) => evalItemVisible(hass, it) ? "1" : "0")
+        .join("");
+
+      if (newFingerprint !== this._visibilityFingerprint) {
+        this._visibilityFingerprint = newFingerprint;
+        this._render();
+      }
     }
 
     setConfig(config) {
       this._config = { ...DEFAULTS, ...(config || {}) };
       if (!Array.isArray(this._config.items)) this._config.items = [];
+
+      // Force le rendu initial après changement de configuration.
+      this._visibilityFingerprint = null;
       this._render();
     }
 
@@ -466,6 +480,9 @@
 
     connectedCallback() {
       if (!this.shadowRoot) this.attachShadow({ mode: "open" });
+
+      // Force le rendu initial à l'attachement.
+      this._visibilityFingerprint = null;
       this._render();
     }
 
@@ -638,10 +655,42 @@
             cursor: pointer;
             min-width: 0;
             color: var(--primary-text-color);
+
+            font: inherit;
             -webkit-tap-highlight-color: transparent;
+            outline: none;
+            touch-action: manipulation;
           }
-          .tile:hover{ background: rgba(255,255,255,0.10); }
-          .tile:active{ background: rgba(255,255,255,0.16); }
+
+          .tile:focus,
+          .tile:focus-visible{
+            outline: none !important;
+          }
+
+          /* Desktop / souris uniquement */
+          @media (hover: hover) and (pointer: fine) {
+            .tile:hover{
+              background: rgba(255,255,255,0.10);
+            }
+            .tile:active{
+              background: rgba(255,255,255,0.16);
+            }
+          }
+
+          /* iPad / iPhone / tactile : logique reprise du composant activhome-light-stack */
+          @media (hover: none) and (pointer: coarse) {
+            .tile{
+              transition: none !important;
+            }
+
+            .tile:hover{
+              background: none !important;
+            }
+
+            .tile:active{
+              background: rgba(255,255,255,0.10) !important;
+            }
+          }
 
           .ico{ --mdc-icon-size: ${iconSize}px; }
           .lbl{
@@ -669,7 +718,7 @@
                   const hasIcon = showIconItem && !!icon;
                   const iconStyle = iconColor ? ` style="color:${escapeHtml(iconColor)};"` : "";
                   return `
-                    <button class="tile ${hasIcon ? "" : "noIcon"}" data-idx="${idx}" aria-label="${name}">
+                    <button class="tile ${hasIcon ? "" : "noIcon"}" data-idx="${idx}" aria-label="${name}" tabindex="-1" type="button">
                       ${hasIcon ? `<ha-icon class="ico" icon="${escapeHtml(icon)}"${iconStyle}></ha-icon>` : ``}
                       <div class="lbl">${name}</div>
                     </button>
@@ -694,15 +743,31 @@
         else cardEl.style.removeProperty("--ah-accent-color");
       }
 
-      const btns = this.shadowRoot.querySelectorAll(".tile");
-      btns.forEach((btn) => {
-        btn.addEventListener("click", (ev) => {
+      const gridEl = this.shadowRoot.querySelector(".grid");
+      if (gridEl) {
+        gridEl.addEventListener("click", (ev) => {
+          const btn = ev.target?.closest?.(".tile");
+          if (!btn || !gridEl.contains(btn)) return;
+
           ev.stopPropagation();
+
+          // iOS/WKWebView : même logique que le composant light-stack.
+          // On libère le focus implicite immédiatement.
+          try { btn.blur?.(); } catch (_) {}
+          try { this.shadowRoot?.activeElement?.blur?.(); } catch (_) {}
+
           const idx = Number(btn.getAttribute("data-idx"));
           const item = renderedItems[idx];
+
           this._doAction(item);
+
+          // Sécurité post-action HA.
+          setTimeout(() => {
+            try { btn.blur?.(); } catch (_) {}
+            try { this.shadowRoot?.activeElement?.blur?.(); } catch (_) {}
+          }, 0);
         });
-      });
+      }
     }
 
     static getConfigElement() {
