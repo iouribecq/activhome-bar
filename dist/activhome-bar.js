@@ -1,4 +1,4 @@
-// Activhome Bar - v0.1.7 (iPad interaction fix - light-stack pattern)
+// Activhome Bar - v0.1.8 (iPad WKWebView : suppression totale état visuel natif)
 // Type: custom:activhome-bar
 //
 // CHANGELOG v0.1.6:
@@ -657,39 +657,30 @@
             color: var(--primary-text-color);
 
             font: inherit;
+            /* Coupe TOUT état natif WebKit/WKWebView */
             -webkit-tap-highlight-color: transparent;
-            outline: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
             touch-action: manipulation;
+            outline: none;
+            /* Pas de :hover, pas de :active en CSS — géré en JS uniquement */
           }
 
+          /* Supprime tout état focus natif */
           .tile:focus,
-          .tile:focus-visible{
+          .tile:focus-visible,
+          .tile:focus-within,
+          .tile:active,
+          .tile:hover {
             outline: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
           }
 
-          /* Desktop / souris uniquement */
+          /* Hover uniquement sur vrai pointeur souris */
           @media (hover: hover) and (pointer: fine) {
-            .tile:hover{
-              background: rgba(255,255,255,0.10);
-            }
-            .tile:active{
-              background: rgba(255,255,255,0.16);
-            }
-          }
-
-          /* iPad / iPhone / tactile : logique reprise du composant activhome-light-stack */
-          @media (hover: none) and (pointer: coarse) {
-            .tile{
-              transition: none !important;
-            }
-
-            .tile:hover{
-              background: none !important;
-            }
-
-            .tile:active{
-              background: rgba(255,255,255,0.10) !important;
-            }
+            .tile:hover { background: rgba(255,255,255,0.10) !important; }
           }
 
           .ico{ --mdc-icon-size: ${iconSize}px; }
@@ -718,10 +709,10 @@
                   const hasIcon = showIconItem && !!icon;
                   const iconStyle = iconColor ? ` style="color:${escapeHtml(iconColor)};"` : "";
                   return `
-                    <button class="tile ${hasIcon ? "" : "noIcon"}" data-idx="${idx}" aria-label="${name}" tabindex="-1" type="button">
+                    <div class="tile ${hasIcon ? "" : "noIcon"}" role="button" tabindex="0" data-idx="${idx}" aria-label="${name}">
                       ${hasIcon ? `<ha-icon class="ico" icon="${escapeHtml(icon)}"${iconStyle}></ha-icon>` : ``}
                       <div class="lbl">${name}</div>
-                    </button>
+                    </div>
                   `;
                 })
                 .join("")}
@@ -743,31 +734,44 @@
         else cardEl.style.removeProperty("--ah-accent-color");
       }
 
-      const gridEl = this.shadowRoot.querySelector(".grid");
-      if (gridEl) {
-        gridEl.addEventListener("click", (ev) => {
-          const btn = ev.target?.closest?.(".tile");
-          if (!btn || !gridEl.contains(btn)) return;
+      const btns = this.shadowRoot.querySelectorAll(".tile");
+      btns.forEach((btn) => {
 
+        btn.addEventListener("pointerdown", () => {
+          // Flash visuel immédiat — 100% JS, aucun état CSS natif impliqué
+          btn.style.setProperty("background", "rgba(255,255,255,0.16)", "important");
+        });
+
+        const clearPress = () => {
+          btn.style.removeProperty("background");
+        };
+
+        btn.addEventListener("pointerup", (ev) => {
           ev.stopPropagation();
-
-          // iOS/WKWebView : même logique que le composant light-stack.
-          // On libère le focus implicite immédiatement.
-          try { btn.blur?.(); } catch (_) {}
-          try { this.shadowRoot?.activeElement?.blur?.(); } catch (_) {}
+          clearPress();
 
           const idx = Number(btn.getAttribute("data-idx"));
           const item = renderedItems[idx];
-
           this._doAction(item);
 
-          // Sécurité post-action HA.
-          setTimeout(() => {
-            try { btn.blur?.(); } catch (_) {}
-            try { this.shadowRoot?.activeElement?.blur?.(); } catch (_) {}
-          }, 0);
+          // Sécurité : WKWebView peut remettre un état après l'action
+          setTimeout(clearPress, 50);
+          setTimeout(clearPress, 150);
         });
-      }
+
+        btn.addEventListener("pointercancel", clearPress);
+        btn.addEventListener("pointerleave", clearPress);
+
+        // Accessibilité clavier
+        btn.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            const idx = Number(btn.getAttribute("data-idx"));
+            const item = renderedItems[idx];
+            this._doAction(item);
+          }
+        });
+      });
     }
 
     static getConfigElement() {
