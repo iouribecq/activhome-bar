@@ -1,24 +1,30 @@
-// Activhome Bar - v0.1.8 (iPad WKWebView : suppression totale état visuel natif)
+// Activhome Bar - v0.1.9
 // Type: custom:activhome-bar
 //
+// CHANGELOG v0.1.9:
+// - ADD: prise en charge de l'action "url" (https://, doorbird://, tel:, mailto:, ...)
+//
+// CHANGELOG v0.1.8:
+// - FIX: suppression totale de l'état visuel natif sous iPad WKWebView.
+//
 // CHANGELOG v0.1.6:
-// - OPTION: single_row (1 seule ligne) : adapte automatiquement le nombre de colonnes au nombre d’items visibles.
-// - PERF: émission config-changed dé-bouncée dans l’éditeur (réduit la latence).
-// - CSS: tiles shrinkables (min-width:0) + labels ellipsis robustes.
+// - ADD: option "single_row" (une seule ligne) avec adaptation automatique du nombre de colonnes aux items visibles.
+// - PERF: émission "config-changed" dé-bouncée dans l'éditeur (réduction de la latence).
+// - CSS: tuiles rétractables (min-width:0) et ellipsis robustes pour les libellés.
 //
 // CHANGELOG v0.1.5:
-// - FIX UI: champ Thème "Aucun" (plus de chevauchement), valeur sentinelle __none__.
-// - UI: "Barre (global)" repliable + libellés plus pédagogiques.
+// - FIX UI: champ "Thème" avec option "Aucun" (suppression du chevauchement), valeur sentinelle "__none__".
+// - UI: section "Barre (global)" repliable avec libellés plus explicites.
 //
 // CHANGELOG v0.1.4:
-// - REMPLACEMENT: Édition de la visibilité via l'UI native HA (ha-card-conditions-editor)
-//   au lieu du JSON manuel.
+// - REFACTOR: remplacement de l'éditeur JSON par l'éditeur natif Home Assistant (ha-card-conditions-editor)
+//   pour la gestion des conditions de visibilité.
 //
-// ADD v0.1.3:
-// - show_icons (global) + show_icon (per item override)
-// - visibility (Lovelace-like) per item: state / and / or / not
-// - dock=top default top=56 if top not explicitly set
-// - Editor labels + help text blocks (UI more user-friendly)
+// CHANGELOG v0.1.3:
+// - ADD: show_icons (global) et show_icon (par item).
+// - ADD: gestion des conditions de visibilité (state / and / or / not).
+// - ADD: dock=top avec top=56 par défaut si aucune valeur n'est définie.
+// - UI: amélioration des libellés et des textes d'aide.
 
 (() => {
   const DEFAULTS = {
@@ -514,6 +520,19 @@
           if (!path) return;
           history.pushState(null, "", path);
           window.dispatchEvent(new Event("location-changed"));
+          return;
+        }
+
+        if (a === "url") {
+          const url = String(
+            act.url_path ||
+            act.url ||
+            ""
+          ).trim();
+
+          if (!url) return;
+
+          window.location.href = url;
           return;
         }
 
