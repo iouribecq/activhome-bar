@@ -1,3 +1,6 @@
+// Activhome Bar - v0.2.2
+// CHANGELOG v0.2.2:
+// - FIX: prise en charge correcte de l'action "url" avant hass.callAction().
 // Activhome Bar - v0.2.1
 // Type: custom:activhome-bar
 //
@@ -506,22 +509,7 @@
           act.entity = fallbackEntity;
         }
 
-        try {
-          if (typeof hass.callAction === "function") {
-            hass.callAction(act);
-            return;
-          }
-        } catch (e) {}
-
         const a = String(act.action || "more-info").toLowerCase();
-
-        if (a === "navigate") {
-          const path = String(act.navigation_path || act.navigationPath || "").trim();
-          if (!path) return;
-          history.pushState(null, "", path);
-          window.dispatchEvent(new Event("location-changed"));
-          return;
-        }
 
         if (a === "url") {
           const url = String(
@@ -533,6 +521,21 @@
           if (!url) return;
 
           window.location.href = url;
+          return;
+        }
+
+        try {
+          if (typeof hass.callAction === "function") {
+            hass.callAction(act);
+            return;
+          }
+        } catch (e) {}
+
+        if (a === "navigate") {
+          const path = String(act.navigation_path || act.navigationPath || "").trim();
+          if (!path) return;
+          history.pushState(null, "", path);
+          window.dispatchEvent(new Event("location-changed"));
           return;
         }
 
@@ -553,9 +556,17 @@
         if (a === "call-service" || a === "perform-action") {
           const svc = String(act.service || act.perform_action || "").trim();
           if (!svc.includes(".")) return;
+
           const [domain, service] = svc.split(".");
-          const sd = (act.service_data && typeof act.service_data === "object") ? act.service_data : {};
-          const target = act.target && typeof act.target === "object" ? act.target : {};
+          const sd =
+            act.service_data && typeof act.service_data === "object"
+              ? act.service_data
+              : {};
+          const target =
+            act.target && typeof act.target === "object"
+              ? act.target
+              : {};
+
           const payload = { ...sd, ...target };
           hass.callService(domain, service, payload);
           return;
@@ -578,11 +589,26 @@
         window.dispatchEvent(new Event("location-changed"));
         return;
       }
+
+      if (action === "url") {
+        const url = String(
+          item.url_path ||
+          item.url ||
+          ""
+        ).trim();
+
+        if (!url) return;
+
+        window.location.href = url;
+        return;
+      }
+
       if (action === "more-info") {
         if (!item.entity) return;
         fireEvent(this, "hass-more-info", { entityId: item.entity });
         return;
       }
+
       if (action === "call-service") {
         const svc = String(item.service || "").trim();
         if (!svc.includes(".")) return;
@@ -590,12 +616,16 @@
         hass.callService(domain, service, item.service_data || {});
         return;
       }
+
       if (action === "toggle") {
         if (!item.entity) return;
         hass.callService("homeassistant", "toggle", { entity_id: item.entity });
         return;
       }
-      if (item.entity) fireEvent(this, "hass-more-info", { entityId: item.entity });
+
+      if (item.entity) {
+        fireEvent(this, "hass-more-info", { entityId: item.entity });
+      }
     }
 
     _render() {
