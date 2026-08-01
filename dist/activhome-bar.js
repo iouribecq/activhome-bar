@@ -1,7 +1,7 @@
-// Activhome Bar - v0.1.9
+// Activhome Bar - v0.2.1
 // Type: custom:activhome-bar
 //
-// CHANGELOG v0.1.9:
+// CHANGELOG v0.2.1:
 // - ADD: prise en charge de l'action "url" (https://, doorbird://, tel:, mailto:, ...)
 //
 // CHANGELOG v0.1.8:
