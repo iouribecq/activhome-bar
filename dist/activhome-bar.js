@@ -512,15 +512,10 @@
         const a = String(act.action || "more-info").toLowerCase();
 
         if (a === "url") {
-          const url = String(
-            act.url_path ||
-            act.url ||
-            ""
-          ).trim();
-
-          if (!url) return;
-
-          window.location.href = url;
+          fireEvent(this, "hass-action", {
+            config: item,
+            action: "tap",
+          });
           return;
         }
 
