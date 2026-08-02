@@ -1,3 +1,9 @@
+// Activhome Bar - v0.2.5
+//
+// CHANGELOG v0.2.5:
+// - ADD: prise en charge de l'action "url" via window.open().
+// - Support des URL externes et des schémas d'application comme doorbird://.
+//
 // Activhome Bar - v0.2.4
 //
 // CHANGELOG v0.2.4:
@@ -507,14 +513,27 @@
           act.entity = fallbackEntity;
         }
 
+        const a = String(act.action || "more-info").toLowerCase();
+
+        if (a === "url") {
+          const url = String(
+            act.url_path ||
+            act.url ||
+            ""
+          ).trim();
+
+          if (!url) return;
+
+          window.open(url);
+          return;
+        }
+
         try {
           if (typeof hass.callAction === "function") {
             hass.callAction(act);
             return;
           }
         } catch (e) {}
-
-        const a = String(act.action || "more-info").toLowerCase();
 
         if (a === "navigate") {
           const path = String(act.navigation_path || act.navigationPath || "").trim();
