@@ -1,6 +1,6 @@
-// Activhome Bar - v0.2.3
+// Activhome Bar - v0.2.4
 //
-// CHANGELOG v0.2.3:
+// CHANGELOG v0.2.4:
 // - Revert: suppression des essais de prise en charge de l'action "url".
 // - Le comportement d'origine de _doAction() est restauré.
 // - Les autres fonctionnalités restent inchangées.
