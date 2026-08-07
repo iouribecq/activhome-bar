@@ -1,3 +1,9 @@
+// Activhome Bar - v0.2.6
+//
+// CHANGELOG v0.2.6:
+// - FIX EDITOR: le champ Nom des items utilise désormais le sélecteur texte natif Home Assistant.
+// - Aucun changement du rendu, des actions, de la visibilité ou du comportement tactile.
+//
 // Activhome Bar - v0.2.5
 //
 // CHANGELOG v0.2.5:
@@ -1346,12 +1352,19 @@
         content.className = "content";
         content.style.marginTop = "10px";
 
-        const nameField = document.createElement("ha-textfield");
-        nameField.label = "Nom";
+        const nameLabel = document.createElement("div");
+        nameLabel.className = "mini";
+        nameLabel.style.fontWeight = "bold";
+        nameLabel.textContent = "Nom";
+        content.appendChild(nameLabel);
+
+        const nameField = document.createElement("ha-selector");
+        nameField.hass = this._hass;
+        nameField.selector = { text: {} };
         nameField.value = item.name || "";
         nameField.style.width = "100%";
-        nameField.addEventListener("input", (ev) => {
-          const v = ev.target?.value ?? "";
+        nameField.addEventListener("value-changed", (ev) => {
+          const v = ev.detail?.value ?? "";
           const next = [...getItems()];
           next[idx] = { ...(next[idx] || {}), name: v };
           this._config = { ...this._config, items: next };
